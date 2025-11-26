@@ -1,0 +1,59 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+.claude
+
+# Smart contract build artifacts and deployment logs
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+.vercel
+
+/build
+create-attestor-standalone.sh
+README.md
+# contract: build artifacts, caches, broadcasts, logs, node deps
+/contract/out/
+/contract/cache/
+/contract/broadcast/
+/contract/forge-create.out
+/contract/*.log
+/contract/node_modules/
+/contract/**/*.log
+
+# vendor libs (optional — remove if you intentionally want to keep them)
+/contract/lib/openzeppelin-contracts/
+/contract/lib/forge-std/
+
+# OS / misc
+.DS_Store
+*.swp
+*.tmp

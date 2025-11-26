@@ -1,0 +1,37 @@
+{
+  "chain_id": 11155111,
+  "sender": "{{ENV.SENDER_ADDRESS}}",
+  "delegate": "{{TRANSACTION_INTENT_DELEGATE}}",
+  "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+  "target": {
+    "contract": "{{ENV.TARGET_CONTRACT}}",
+    "function": "purchaseTokens((uint256,uint256,bytes32,(bytes32,bytes,bytes)[],bytes,bool,bytes),uint256)",
+    "authData_result": "0x00",
+    "parameters": [
+      {
+        "name": "usdcAmount",
+        "type": "uint256",
+        "value": "{{USDC_AMOUNT}}"
+      }
+    ]
+  },
+  "sponsor_execution_fee": true,
+  "value": "0",
+  "intent": {
+    "id": "{{TRANSACTION_INTENT_ID}}",
+    "signature": "{{USER_SIGNATURE}}",
+    "deadline": "{{TRANSACTION_INTENT_DEADLINE}}"
+  },
+  "rpc_url": "${_SECRETS.rpcSepoliaURL}",
+  "bundler_url": "https://api.pimlico.io/v2/sepolia/rpc?apikey=${_SECRETS.pimlico-apikey}",
+  "paymaster_url": "https://api.pimlico.io/v2/sepolia/rpc?apikey=${_SECRETS.pimlico-apikey}",
+  "gas_limit": "100000",
+  "max_fee_per_gas": "20000000000",
+  "max_priority_fee_per_gas": "2000000000",
+
+  "workflow": {
+    "name": "real-estate-investment-purchase-tokens",
+    "version": "v1.0.0",
+    "steps": []
+  }
+}

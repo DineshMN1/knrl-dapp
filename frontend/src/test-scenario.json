@@ -1,0 +1,237 @@
+{
+  "chain_id": 11155111,
+  "sender": "{{ENV.SENDER_ADDRESS}}",
+  "delegate": "{{TRANSACTION_INTENT_DELEGATE}}",
+  "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+  "target": {
+    "contract": "{{ENV.TARGET_CONTRACT}}",
+    "function": "submitPropertyAnalysis((uint256,uint256,bytes32,(bytes32,bytes,bytes)[],bytes,bool,bytes))",
+    "authData_result": "${construct-property-analysis-evm.result}",
+    "parameters": []
+  },
+  "sponsor_execution_fee": true,
+  "value": "0",
+  "intent": {
+    "id": "{{TRANSACTION_INTENT_ID}}",
+    "signature": "{{USER_SIGNATURE}}",
+    "deadline": "{{TRANSACTION_INTENT_DEADLINE}}"
+  },
+  "rpc_url": "${_SECRETS.rpcSepoliaURL}",
+  "bundler_url": "https://api.pimlico.io/v2/sepolia/rpc?apikey=${_SECRETS.pimlico-apikey}",
+  "paymaster_url": "https://api.pimlico.io/v2/sepolia/rpc?apikey=${_SECRETS.pimlico-apikey}",
+  "gas_limit": "100000",
+  "max_fee_per_gas": "20000000000",
+  "max_priority_fee_per_gas": "2000000000",
+
+  "workflow": {
+    "name": "real-estate-investment-submit-property-analysis",
+    "version": "v1.0.0",
+    "steps": [
+      {
+        "name": "property-data-fetcher",
+        "image": "ghcr.io/krnl-labs/executor-http@sha256:07ef35b261014304a0163502a7f1dec5395c5cac1fc381dc1f79b052389ab0d5",
+        "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+        "next": "market-data-fetcher",
+        "inputs": {
+          "url": "https://poc.platform.lat/zillow/webservice/GetSearchResults.htm?zws-id=demo-api-key&address=1234-Maple-Street&citystatezip=Austin,TX",
+          "method": "GET"
+        },
+        "outputs": [
+          {
+            "name": "zpid",
+            "value": "response.body.searchResults.zpid",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "address.street",
+            "value": "response.body.searchResults.address.street",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "address.zipcode",
+            "value": "response.body.searchResults.address.zipcode",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "address.city",
+            "value": "response.body.searchResults.address.city",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "address.state",
+            "value": "response.body.searchResults.address.state",
+            "required": true,
+            "export": true
+          }
+        ]
+      },
+      {
+        "name": "market-data-fetcher",
+        "image": "ghcr.io/krnl-labs/executor-http@sha256:07ef35b261014304a0163502a7f1dec5395c5cac1fc381dc1f79b052389ab0d5",
+        "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+        "next": "ai-property-analysis",
+        "inputs": {
+          "url": "https://poc.platform.lat/zillow/webservice/GetZestimate.htm?zws-id=demo-api-key&zpid=${property-data-fetcher.zpid}",
+          "method": "GET"
+        },
+        "outputs": [
+          {
+            "name": "zestimate.amount.value",
+            "value": "response.body.zestimate.amount.value",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "zestimate.amount.currency",
+            "value": "response.body.zestimate.amount.currency",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "zestimate.rent.value",
+            "value": "response.body.zestimate.rentZestimate.value",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "zestimate.rent.currency",
+            "value": "response.body.zestimate.rentZestimate.currency",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "property.bedrooms",
+            "value": "response.body.property.bedrooms",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "property.bathrooms",
+            "value": "response.body.property.bathrooms",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "property.finishedSqFt",
+            "value": "response.body.property.finishedSqFt",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "property.yearBuilt",
+            "value": "response.body.property.yearBuilt",
+            "required": true,
+            "export": true
+          },
+          {
+            "name": "property.type",
+            "value": "response.body.property.propertyType",
+            "required": true,
+            "export": true
+          }
+        ]
+      },
+      {
+        "name": "ai-property-analysis",
+        "image": "ghcr.io/krnl-labs/executor-http@sha256:07ef35b261014304a0163502a7f1dec5395c5cac1fc381dc1f79b052389ab0d5",
+        "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+        "next": "construct-property-analysis-evm",
+        "inputs": {
+          "url": "https://poc.platform.lat/openai/openai-api?poc=property-analysis",
+          "method": "GET",
+          "headers": {
+            "Accept": "*/*",
+            "Content-Type": "application/json",
+            "Authorization": "Bearer ${_SECRETS.OPENAI_API_KEY}"
+          },
+          "body": {
+            "model": "gpt-4o-mini",
+            "temperature": 0,
+            "response_format": {
+              "type": "json_object"
+            },
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a professional real estate analyst. Only output valid JSON."
+              },
+              {
+                "role": "user",
+                "content": "You are a professional real estate investment analyst with 15 years of experience. You analyze property data objectively and provide structured investment recommendations. Analyze this property for investment potential. Property: ${property-data-fetcher.address.street}, ${property-data-fetcher.address.city}, ${property-data-fetcher.address.state} ${property-data-fetcher.address.zipcode}. With bedrooms: ${market-data-fetcher.property.bedrooms}, bathrooms: ${market-data-fetcher.property.bathrooms}, finished square feet: ${market-data-fetcher.property.finishedSqFt}, year built: ${market-data-fetcher.property.yearBuilt}, type: ${market-data-fetcher.property.type}. Zillow Estimate: ${market-data-fetcher.zestimate.amount.value}(${market-data-fetcher.zestimate.amount.currency}). Monthly rent Zillow estimate: ${market-data-fetcher.zestimate.rent.value}(${market-data-fetcher.zestimate.rent.currency}). Return analysis in this exact JSON format: { recommendation: INVEST/HOLD/PASS, property_value: number*10^20, investment_grade: A+/A/B+/B/C+/C/D, expected_annual_yield: number*10^18, confidence: number (1-100), invest_value: number * 10^18 }. Always return valid JSON in the exact format requested."
+              }
+            ]
+          },
+          "timeout": 30
+        },
+        "outputs": [
+          {
+            "name": "result",
+            "value": "response.body.choices.0.message.content",
+            "type": "json",
+            "required": true,
+            "export": true
+          }
+        ]
+      },
+      {
+        "name": "construct-property-analysis-evm",
+        "image": "ghcr.io/krnl-labs/executor-encoder-evm@sha256:b28823d12eb1b16cbcc34c751302cd2dbe7e35480a5bc20e4e7ad50a059b6611",
+        "attestor": "{{ENV.ATTESTOR_IMAGE}}",
+        "next": "prepare-authdata",
+        "config": {
+          "parameters": [
+            {
+              "name": "propertyInfo",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "confidence",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expectedAnnualYield",
+                  "type": "uint256"
+                },
+                {
+                  "name": "investmentGrade",
+                  "type": "string"
+                },
+                {
+                  "name": "propertyValue",
+                  "type": "uint256"
+                },
+                {
+                  "name": "recommendation",
+                  "type": "string"
+                }
+              ]
+            }
+          ]
+        },
+        "inputs": {
+          "value": {
+            "propertyInfo": {
+              "confidence": "${ai-property-analysis.result.confidence}",
+              "expectedAnnualYield": "${ai-property-analysis.result.expected_annual_yield}",
+              "investmentGrade": "${ai-property-analysis.result.investment_grade}",
+              "propertyValue": "70000000000000000000000",
+              "recommendation": "${ai-property-analysis.result.recommendation}"
+            }
+          }
+        },
+        "outputs": [
+          {
+            "name": "result",
+            "value": "result",
+            "required": true,
+            "export": true
+          }
+        ]
+      }
+    ]
+  }
+}
