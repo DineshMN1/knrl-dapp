@@ -175,18 +175,21 @@ const Dashboard = () => {
           setIsRefreshing={setIsRefreshing}
         />
 
+      
         {/* Workflow Execution Section */}
-        <WorkflowExecution
-          isAuthorized={isAuthorized}
-          currentStep={currentStep}
-          executeWorkflow={executeWorkflow}
-          mintUSDC={mintUSDC}
-          isMintingUSDC={isMintingUSDC}
-          usdcBalance={usdcBalance}
-          isLoadingUSDC={isLoadingUSDC}
-          refetchUSDC={refetchUSDC}
-          balance={balance}
-        />
+      <WorkflowExecution
+  isAuthorized={isAuthorized}
+  currentStep={currentStep}
+  executeWorkflow={executeWorkflow}
+  mintUSDC={mintUSDC}
+  isMintingUSDC={isMintingUSDC}
+  usdcBalance={usdcBalance}
+  isLoadingUSDC={isLoadingUSDC}
+  refetchUSDC={refetchUSDC}
+  balance={balance}
+  onActiveScenarioChange={setActiveScenario} // <-- new prop
+/>
+
 
         {/* Workflow Tracking Modal */}
         <WorkflowTrackingModal

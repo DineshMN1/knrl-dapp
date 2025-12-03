@@ -1,3 +1,4 @@
+// src/components/WorkflowExecution.tsx
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,9 @@ interface WorkflowExecutionProps {
   isLoadingUSDC?: boolean;
   refetchUSDC?: () => Promise<void>;
   balance: string;
+
+  // NEW prop
+  onActiveScenarioChange?: (scenario: 'A' | 'B' | null) => void;
 }
 
 export const WorkflowExecution = ({
@@ -37,7 +41,8 @@ export const WorkflowExecution = ({
   usdcBalance,
   isLoadingUSDC,
   refetchUSDC,
-  balance
+  balance,
+  onActiveScenarioChange
 }: WorkflowExecutionProps) => {
   // Event form state
   const [eventName, setEventName] = useState('');
@@ -96,6 +101,19 @@ export const WorkflowExecution = ({
     const priceWei = BigInt(Math.round(parseFloat(eventPrice) * 1e18)).toString();
 
     try {
+      // notify parent to set active scenario so the modal can open
+      try {
+        onActiveScenarioChange?.('B');
+        console.log('[WorkflowExecution] set activeScenario -> B');
+      } catch (e) {
+        console.warn('onActiveScenarioChange failed:', e);
+      }
+
+      // call the workflow executor
+      console.log('[WorkflowExecution] calling executeWorkflow with:', {
+        eventName, eventLocation, eventPrice, eventDescription, eventHost, eventStartISO, eventMaxPeople, priceWei
+      });
+
       await executeWorkflow(
         'B',
         eventName,
@@ -110,6 +128,7 @@ export const WorkflowExecution = ({
     } catch (err: any) {
       const message = err?.message || 'Failed to create event';
       toast.error(message);
+      console.error('handleCreateEvent error:', err);
     }
   };
 
