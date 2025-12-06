@@ -11,17 +11,17 @@
       {
         "name": "param1",
         "type": "uint256",
-        "value": ""
+        "value": "{{EVENT_ID}}"
       },
       {
         "name": "param2",
         "type": "uint256",
-        "value": ""
+        "value": "{{CODE}}"
       },
       {
         "name": "param3",
         "type": "address",
-        "value": ""
+        "value": "{{BUYER}}"
       }
     ]
   },

@@ -1,40 +1,103 @@
-// src/components/WorkflowExecution.tsx
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Play, Ticket } from 'lucide-react';
+import { Loader2, Play, Coins } from 'lucide-react';
 import toast from 'react-hot-toast';
+import React from 'react';
 
 interface WorkflowExecutionProps {
   isAuthorized: boolean;
   currentStep: number;
-  executeWorkflow: (
-    scenarioType: 'B',
-    eventName?: string,
-    eventLocation?: string,
-    eventPrice?: string,
-    eventDescription?: string,
-    eventHost?: string,
-    eventStartUnix?: string,
-    eventMaxPeople?: string,
-    eventPriceWei?: string
-  ) => Promise<void>;
-  mintUSDC?: () => Promise<any>;
-  isMintingUSDC?: boolean;
-  usdcBalance?: string;
-  isLoadingUSDC?: boolean;
-  refetchUSDC?: () => Promise<void>;
+  activeScenario: 'create' | 'buy' | 'verify' | 'withdraw' | null;
+
+  // Create
+  eventName: string;
+  eventDescription: string;
+  eventHost: string;
+  eventLocation: string;
+  eventStartUnix: string;
+  eventMaxPeople: string;
+  eventPriceWei: string;
+
+  // Buy
+  buyEventId: string;
+  buyCode: string;
+  buyBuyer: string;
+
+  // Verify
+  verifyEventId: string;
+  verifyCode: string;
+  verifyMarkRedeemed: boolean;
+
+  // Withdraw
+  withdrawEventId: string;
+  withdrawTo: string;
+
+  validationErrors: any;
+
+  executeWorkflow: (scenario: 'create' | 'buy' | 'verify' | 'withdraw', replacements: Record<string, string>) => Promise<void>;
+  mintUSDC: () => Promise<any>;
+  isMintingUSDC: boolean;
+  usdcBalance: string;
+  isLoadingUSDC: boolean;
+  refetchUSDC: () => Promise<void>;
   balance: string;
 
-  // NEW prop
-  onActiveScenarioChange?: (scenario: 'A' | 'B' | null) => void;
+  // setters passed from parent
+  setEventName: (v: string) => void;
+  setEventDescription: (v: string) => void;
+  setEventHost: (v: string) => void;
+  setEventLocation: (v: string) => void;
+  setEventStartUnix: (v: string) => void;
+  setEventMaxPeople: (v: string) => void;
+  setEventPriceWei: (v: string) => void;
+
+  setBuyEventId: (v: string) => void;
+  setBuyCode: (v: string) => void;
+  setBuyBuyer: (v: string) => void;
+
+  setVerifyEventId: (v: string) => void;
+  setVerifyCode: (v: string) => void;
+  setVerifyMarkRedeemed: (v: boolean) => void;
+
+  setWithdrawEventId: (v: string) => void;
+  setWithdrawTo: (v: string) => void;
+
+  onActiveScenarioChange: (s: 'create' | 'buy' | 'verify' | 'withdraw' | null) => void;
+  validateInputs: () => boolean;
 }
 
-export const WorkflowExecution = ({
+export const WorkflowExecution: React.FC<WorkflowExecutionProps> = ({
   isAuthorized,
   currentStep,
+  activeScenario,
+
+  // create
+  eventName,
+  eventDescription,
+  eventHost,
+  eventLocation,
+  eventStartUnix,
+  eventMaxPeople,
+  eventPriceWei,
+
+  // buy
+  buyEventId,
+  buyCode,
+  buyBuyer,
+
+  // verify
+  verifyEventId,
+  verifyCode,
+  verifyMarkRedeemed,
+
+  // withdraw
+  withdrawEventId,
+  withdrawTo,
+
+  validationErrors,
+
   executeWorkflow,
   mintUSDC,
   isMintingUSDC,
@@ -42,169 +105,236 @@ export const WorkflowExecution = ({
   isLoadingUSDC,
   refetchUSDC,
   balance,
-  onActiveScenarioChange
-}: WorkflowExecutionProps) => {
-  // Event form state
-  const [eventName, setEventName] = useState('');
-  const [eventDescription, setEventDescription] = useState('');
-  const [eventHost, setEventHost] = useState('');
-  const [eventLocation, setEventLocation] = useState('');
-  const [eventStartISO, setEventStartISO] = useState(''); 
-  const [eventMaxPeople, setEventMaxPeople] = useState('100');
-  const [eventPrice, setEventPrice] = useState('0.01'); 
 
-  const validateRequirements = (): boolean => {
+  setEventName,
+  setEventDescription,
+  setEventHost,
+  setEventLocation,
+  setEventStartUnix,
+  setEventMaxPeople,
+  setEventPriceWei,
+
+  setBuyEventId,
+  setBuyCode,
+  setBuyBuyer,
+
+  setVerifyEventId,
+  setVerifyCode,
+  setVerifyMarkRedeemed,
+
+  setWithdrawEventId,
+  setWithdrawTo,
+
+  onActiveScenarioChange,
+  validateInputs
+}) => {
+
+  const validateRequirements = (scenario: 'create' | 'buy' | 'verify' | 'withdraw') => {
     if (!isAuthorized) {
       toast.error('Smart account must be authorized first');
       return false;
     }
-
-    if (parseFloat(balance) <= 0.01) {
-      toast.error('Insufficient ETH balance. You need at least 0.01 ETH to create events.');
+    if (parseFloat(balance || '0') <= 0.03) {
+      toast.error('Insufficient balance. Need > 0.03 ETH');
       return false;
     }
-
-    if (!eventName.trim()) {
-      toast.error('Event name is required');
-      return false;
+    if (scenario === 'buy' && parseFloat(usdcBalance || '0') <= 0) {
+      // for ticketing buy, if price is > 0 and USDC used, you may check. Keep flexible.
+      // For this POC we don't enforce USDC minimum unless you want to.
     }
-
-    if (!eventLocation.trim()) {
-      toast.error('Event location is required');
-      return false;
-    }
-
-    if (!eventStartISO || isNaN(Date.parse(eventStartISO))) {
-      toast.error('Valid event start date/time is required');
-      return false;
-    }
-
-    if (!/^\d+$/.test(eventMaxPeople) || Number(eventMaxPeople) <= 0) {
-      toast.error('Max people must be a positive integer');
-      return false;
-    }
-
-    if (isNaN(parseFloat(eventPrice)) || Number(eventPrice) <= 0) {
-      toast.error('Ticket price must be a positive number');
-      return false;
-    }
-
     return true;
   };
 
-  const toUnixSeconds = (iso: string) => String(Math.floor(new Date(iso).getTime() / 1000));
+  // Create
+  const doCreate = async () => {
+    if (!eventName || !eventHost) return toast.error('Name & host required');
+    if (!validateRequirements('create')) return;
 
-  const handleCreateEvent = async () => {
-    if (!validateRequirements()) return;
+    const replacements = {
+      '{{EVENT_NAME}}': eventName,
+      '{{EVENT_DESCRIPTION}}': eventDescription,
+      '{{EVENT_HOST}}': eventHost,
+      '{{EVENT_LOCATION}}': eventLocation,
+      '{{EVENT_START_UNIX}}': eventStartUnix,
+      '{{EVENT_MAX_PEOPLE}}': eventMaxPeople,
+      '{{EVENT_PRICE_WEI}}': eventPriceWei
+    };
 
-    // Convert price in ETH → wei (string). Simple conversion: ETH * 1e18
-    const priceWei = BigInt(Math.round(parseFloat(eventPrice) * 1e18)).toString();
+    onActiveScenarioChange('create');
+    await executeWorkflow('create', replacements);
+  };
 
-    try {
-      // notify parent to set active scenario so the modal can open
-      try {
-        onActiveScenarioChange?.('B');
-        console.log('[WorkflowExecution] set activeScenario -> B');
-      } catch (e) {
-        console.warn('onActiveScenarioChange failed:', e);
-      }
+  // Buy
+  const doBuy = async () => {
+    if (!buyEventId || !buyCode) return toast.error('Event ID and code required');
+    if (!validateRequirements('buy')) return;
 
-      // call the workflow executor
-      console.log('[WorkflowExecution] calling executeWorkflow with:', {
-        eventName, eventLocation, eventPrice, eventDescription, eventHost, eventStartISO, eventMaxPeople, priceWei
-      });
+    // Map semantic placeholders; use keys expected by hook mapper
+    const replacements = {
+      '{{EVENT_ID}}': buyEventId,
+      '{{CODE}}': buyCode,
+      '{{BUYER}}': buyBuyer
+    };
 
-      await executeWorkflow(
-        'B',
-        eventName,
-        eventLocation,
-        eventPrice,
-        eventDescription,
-        eventHost,
-        toUnixSeconds(eventStartISO),
-        eventMaxPeople,
-        priceWei
-      );
-    } catch (err: any) {
-      const message = err?.message || 'Failed to create event';
-      toast.error(message);
-      console.error('handleCreateEvent error:', err);
-    }
+    onActiveScenarioChange('buy');
+    await executeWorkflow('buy', replacements);
+  };
+
+  // Verify
+  const doVerify = async () => {
+    if (!verifyEventId || !verifyCode) return toast.error('Event ID and code required');
+    if (!validateRequirements('verify')) return;
+
+    const replacements = {
+      '{{EVENT_ID}}': verifyEventId,
+      '{{CODE}}': verifyCode,
+      '{{MARK_REDEEMED}}': verifyMarkRedeemed ? 'true' : 'false'
+    };
+
+    onActiveScenarioChange('verify');
+    await executeWorkflow('verify', replacements);
+  };
+
+  // Withdraw
+  const doWithdraw = async () => {
+    if (!withdrawEventId || !withdrawTo) return toast.error('Event ID and destination required');
+    if (!validateRequirements('withdraw')) return;
+
+    const replacements = {
+      '{{EVENT_ID}}': withdrawEventId,
+      '{{TO}}': withdrawTo
+    };
+
+    onActiveScenarioChange('withdraw');
+    await executeWorkflow('withdraw', replacements);
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create Event</CardTitle>
-        <CardDescription>Create a new event on-chain — fills ticketing contract with event metadata</CardDescription>
+        <CardTitle>Workflow Execution</CardTitle>
+        <CardDescription>Create / Buy / Verify / Withdraw for TicketingTarget</CardDescription>
       </CardHeader>
-
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="eventName">Event Name</Label>
-            <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="e.g., Summer Concert" disabled={currentStep > 0} />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          <div>
-            <Label htmlFor="eventHost">Host / Organizer</Label>
-            <Input id="eventHost" value={eventHost} onChange={(e) => setEventHost(e.target.value)} placeholder="Organizer name" disabled={currentStep > 0} />
-          </div>
+          {/* Create Event */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Create Event</h3>
+            <div className="space-y-3">
+              <div>
+                <Label>Event Name</Label>
+                <Input value={eventName} onChange={(e) => setEventName(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Host</Label>
+                <Input value={eventHost} onChange={(e) => setEventHost(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Location</Label>
+                <Input value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Start (unix)</Label>
+                  <Input value={eventStartUnix} onChange={(e) => setEventStartUnix(e.target.value)} disabled={currentStep > 0} />
+                </div>
+                <div>
+                  <Label>Max People</Label>
+                  <Input value={eventMaxPeople} onChange={(e) => setEventMaxPeople(e.target.value)} disabled={currentStep > 0} />
+                </div>
+              </div>
+              <div>
+                <Label>Price (wei)</Label>
+                <Input value={eventPriceWei} onChange={(e) => setEventPriceWei(e.target.value)} disabled={currentStep > 0} />
+              </div>
 
-          <div className="md:col-span-2">
-            <Label htmlFor="eventDescription">Description</Label>
-            <Input id="eventDescription" value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} placeholder="Short description" disabled={currentStep > 0} />
-          </div>
-
-          <div>
-            <Label htmlFor="eventLocation">Location / Venue</Label>
-            <Input id="eventLocation" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} placeholder="Venue address" disabled={currentStep > 0} />
-          </div>
-
-          <div>
-            <Label htmlFor="eventStart">Start Date & Time</Label>
-            <Input id="eventStart" type="datetime-local" value={eventStartISO} onChange={(e) => setEventStartISO(e.target.value)} disabled={currentStep > 0} />
-          </div>
-
-          <div>
-            <Label htmlFor="maxPeople">Max Attendees</Label>
-            <Input id="maxPeople" type="number" min="1" value={eventMaxPeople} onChange={(e) => setEventMaxPeople(e.target.value)} disabled={currentStep > 0} />
-          </div>
-
-          <div>
-            <Label htmlFor="ticketPrice">Ticket Price (ETH)</Label>
-            <Input id="ticketPrice" type="number" step="0.0001" value={eventPrice} onChange={(e) => setEventPrice(e.target.value)} disabled={currentStep > 0} />
-          </div>
-
-          <div className="md:col-span-2 flex items-center justify-between mt-2">
-            <div className="text-sm text-muted-foreground">
-              {isLoadingUSDC ? '...' : `USDC Balance: ${usdcBalance ?? 'N/A'}`}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {mintUSDC && (
-                <Button
-                  onClick={async () => {
-                    await mintUSDC();
-                    await refetchUSDC?.();
-                  }}
-                  disabled={!!isMintingUSDC}
-                  variant="outline"
-                  size="sm"
-                >
-                  {isMintingUSDC ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Minting...</> : <><Ticket className="mr-2 h-3 w-3" />Mint USDC</>}
-                </Button>
-              )}
-
-              <Button onClick={handleCreateEvent} disabled={currentStep > 0} className="ml-2">
-                {currentStep > 0 ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : <><Play className="mr-2 h-4 w-4" />Create Event</>}
+              <Button onClick={doCreate} disabled={currentStep > 0} className="w-full">
+                {currentStep > 0 && activeScenario === 'create' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : <><Play className="mr-2 h-4 w-4" />Create Event</>}
               </Button>
             </div>
           </div>
+
+          {/* Buy Ticket */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Buy Ticket</h3>
+            <div className="space-y-3">
+              <div>
+                <Label>Event ID</Label>
+                <Input value={buyEventId} onChange={(e) => setBuyEventId(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Code (uint32)</Label>
+                <Input value={buyCode} onChange={(e) => setBuyCode(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Buyer (optional)</Label>
+                <Input value={buyBuyer} onChange={(e) => setBuyBuyer(e.target.value)} disabled={currentStep > 0} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">Balance: {isLoadingUSDC ? '...' : `${usdcBalance} USDC`}</div>
+                <Button onClick={async () => { await mintUSDC(); await refetchUSDC(); }} disabled={isMintingUSDC} variant="outline" size="sm">
+                  {isMintingUSDC ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Minting...</> : <><Coins className="mr-2 h-3 w-3" />Mint USDC</>}
+                </Button>
+              </div>
+
+              <Button onClick={doBuy} disabled={currentStep > 0} className="w-full" variant="outline">
+                {currentStep > 0 && activeScenario === 'buy' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : <><Play className="mr-2 h-4 w-4" />Buy Ticket</>}
+              </Button>
+            </div>
+          </div>
+
+          {/* Verify Ticket */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Verify Ticket</h3>
+            <div className="space-y-3">
+              <div>
+                <Label>Event ID</Label>
+                <Input value={verifyEventId} onChange={(e) => setVerifyEventId(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Code</Label>
+                <Input value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>Mark Redeemed</Label>
+                <div className="mt-2">
+                  <input type="checkbox" checked={verifyMarkRedeemed} onChange={(e) => setVerifyMarkRedeemed(e.target.checked)} />
+                </div>
+              </div>
+
+              <Button onClick={doVerify} disabled={currentStep > 0} className="w-full">
+                {currentStep > 0 && activeScenario === 'verify' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : <><Play className="mr-2 h-4 w-4" />Verify Ticket</>}
+              </Button>
+            </div>
+          </div>
+
+          {/* Withdraw */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Withdraw Funds</h3>
+            <div className="space-y-3">
+              <div>
+                <Label>Event ID</Label>
+                <Input value={withdrawEventId} onChange={(e) => setWithdrawEventId(e.target.value)} disabled={currentStep > 0} />
+              </div>
+              <div>
+                <Label>To (address)</Label>
+                <Input value={withdrawTo} onChange={(e) => setWithdrawTo(e.target.value)} disabled={currentStep > 0} />
+              </div>
+
+              <Button onClick={doWithdraw} disabled={currentStep > 0} className="w-full">
+                {currentStep > 0 && activeScenario === 'withdraw' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : <><Play className="mr-2 h-4 w-4" />Withdraw</>}
+              </Button>
+            </div>
+          </div>
+
         </div>
       </CardContent>
     </Card>
   );
 };
-
-export default WorkflowExecution;

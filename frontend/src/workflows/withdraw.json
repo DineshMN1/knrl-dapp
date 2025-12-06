@@ -11,12 +11,12 @@
       {
         "name": "param1",
         "type": "uint256",
-        "value": ""
+        "value": "{{EVENT_ID}}"
       },
       {
         "name": "param2",
         "type": "address",
-        "value": ""
+        "value": "{{TO}}"
       }
     ]
   },
